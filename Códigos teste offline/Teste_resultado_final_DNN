@@ -1,0 +1,237 @@
+import os
+import gc
+import fnmatch
+import numpy as np
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import mne
+from tensorflow.keras.layers import Input, Conv1D, MaxPooling1D, Flatten, Dense
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.model_selection import train_test_split
+
+def processar_arquivos(diretorio_raiz, lista_epocas, tarefas, pessoas_escolhidas, limite_por_evento=None):
+    if not os.path.exists(diretorio_raiz):
+        raise FileNotFoundError(f"Diretório raiz '{diretorio_raiz}' não encontrado.")
+
+    canais_desejados = ['Fp1.', 'F7..', 'F3..', 'T7..', 'C3..', 'P7..', 'P3..', 'O1..',
+                        'Fp2.', 'F4..', 'F8..', 'C4..', 'T8..', 'P4..', 'P8..', 'O2..']
+
+    epocas_por_evento = {evento: [] for evento in lista_epocas}
+    total_arquivos_eventos = {evento: 0 for evento in lista_epocas}
+
+    todas_pastas = [p for p in os.listdir(diretorio_raiz) if os.path.isdir(os.path.join(diretorio_raiz, p))]
+    pastas_selecionadas = []
+    
+    for pasta in todas_pastas:
+        try:
+            numero_pasta = int(pasta[1:4])
+            if numero_pasta in pessoas_escolhidas:
+                pastas_selecionadas.append(pasta)
+        except:
+            continue
+
+    print("Pastas selecionadas:", pastas_selecionadas)
+
+    for pasta_pessoa in pastas_selecionadas:
+        caminho_pasta = os.path.join(diretorio_raiz, pasta_pessoa)
+        arquivos_edf = []
+        
+        for tarefa in tarefas:
+            arquivos_edf.extend(fnmatch.filter(os.listdir(caminho_pasta), tarefa))
+        
+        print(f'Processando {pasta_pessoa}...')
+        
+        raws = []
+        for arquivo_edf in arquivos_edf:
+            caminho_arquivo = os.path.join(caminho_pasta, arquivo_edf)
+            raw = mne.io.read_raw_edf(caminho_arquivo, preload=True)
+            raw.pick_channels(canais_desejados)
+            raws.append(raw)
+        
+        if raws:
+            raw_concatenado = mne.concatenate_raws(raws)
+            events, event_id = mne.events_from_annotations(raw_concatenado)
+
+            for evento in lista_epocas:
+                if evento in event_id:
+                    epochs = mne.Epochs(raw_concatenado, events, event_id={evento: event_id[evento]}, 
+                                      tmin=-0.5, tmax=4, baseline=(-0.5, 0))
+                    epocas = epochs.get_data().astype(np.float32)
+                    epocas_por_evento[evento].extend(epocas)
+                    total_arquivos_eventos[evento] += len(epocas)
+
+    print("\nQuantidade de arquivos por evento:")
+    for evento, quantidade in total_arquivos_eventos.items():
+        print(f"{evento}: {quantidade} arquivos")
+
+    if limite_por_evento is None:
+        recomendacao = int(np.mean([q for q in total_arquivos_eventos.values() if q > 0]))
+        print(f"\nRecomendação: Use um limite de {recomendacao} arquivos por evento.")
+        limite_por_evento = recomendacao
+    
+    for evento, epocas in epocas_por_evento.items():
+        if len(epocas) > limite_por_evento:
+            np.random.shuffle(epocas)  
+            epocas_por_evento[evento] = epocas[:limite_por_evento]
+            print(f'{evento} reduzido para {len(epocas_por_evento[evento])} arquivos')
+
+    return epocas_por_evento
+
+def separar_dados(epocas_por_evento):
+    arrays = {}
+    for evento, epocas in epocas_por_evento.items():
+        arrays[evento] = np.array(epocas) if epocas else np.array([])
+        print(f'{evento}_array shape:', arrays[evento].shape)
+
+    del epocas_por_evento
+    gc.collect()
+
+    data = np.concatenate([array for array in arrays.values() if array.size > 0])
+    print("Data shape:", np.shape(data))
+
+    labels = []
+    for i, (evento, array) in enumerate(arrays.items()):
+        labels.extend([i] * len(array))
+
+    del arrays
+    gc.collect()
+
+    x = np.nan_to_num(data)
+    y = np.array(labels)
+
+    x_min = np.min(x, axis=0)
+    x_max = np.max(x, axis=0)
+    x = (x - x_min) / (x_max - x_min + 1e-8)
+    
+    # Transposição para formato (amostras, tempo, canais)
+    x = x.transpose(0, 2, 1)
+    
+    print("Shape final do x:", x.shape)
+    print("Shape do y:", y.shape)
+    print("Valores únicos em y:", np.unique(y))
+
+    return x, y
+
+def criar_modelo():
+    model = Sequential([
+        Conv1D(20, kernel_size=6, activation='relu', input_shape=(721, 16)),
+        Conv1D(20, kernel_size=6, activation='relu'),
+        MaxPooling1D(pool_size=2),
+        Flatten(),
+        Dense(60, activation='relu'),
+        Dense(1, activation='sigmoid')
+    ])
+    
+    model.compile(optimizer=Adam(learning_rate=0.0003),
+                  loss='binary_crossentropy',
+                  metrics=['accuracy'])
+    
+    return model
+
+def main():
+    diretorio_raiz = r"C:\Users\batis\OneDrive\Área de Trabalho\Códigos diversos\Faculdade\BCI\Dados BRUTOS\files"
+    lista_eventos = ["T1", "T2"]
+    tarefas = ["*R04.edf", "*R08.edf", "*R12.edf"]
+    pessoas_escolhidas = list(range(85, 110))
+    resultados = {}
+    pasta_graficos = "graficos_treinamento"
+
+    if not os.path.exists(pasta_graficos):
+        os.makedirs(pasta_graficos)
+
+    for pessoa_num in pessoas_escolhidas:
+        print(f"\n=== Processando S{pessoa_num:03d} ===")
+        
+        try:
+            # Processar dados
+            epocas = processar_arquivos(
+                diretorio_raiz=diretorio_raiz,
+                lista_epocas=lista_eventos,
+                tarefas=tarefas,
+                pessoas_escolhidas=[pessoa_num],
+                limite_por_evento=None
+            )
+            
+            # Separar e normalizar dados
+            x, y = separar_dados(epocas)
+            
+            if x.size == 0 or len(np.unique(y)) < 2:
+                print(f"Dados insuficientes para S{pessoa_num:03d}")
+                resultados[pessoa_num] = None
+                continue
+
+            # Dividir dados
+            X_train, X_test, Y_train, Y_test = train_test_split(
+                x, y, 
+                test_size=0.2, 
+                stratify=y, 
+                random_state=42
+            )
+
+            # Criar e treinar modelo
+            model = criar_modelo()
+            
+            early_stopping = EarlyStopping(
+                monitor='val_accuracy',
+                patience=10,
+                mode='max',
+                restore_best_weights=True
+            )
+
+            history = model.fit(
+                X_train, Y_train,
+                epochs=100,
+                batch_size=32,
+                validation_data=(X_test, Y_test),
+                callbacks=[early_stopping],
+                verbose=0
+            )
+
+            # Plotar gráficos
+            plt.figure(figsize=(12, 5))
+            plt.subplot(1, 2, 1)
+            plt.plot(history.history['accuracy'], label='Treino')
+            plt.plot(history.history['val_accuracy'], label='Validação')
+            plt.title(f'Acurácia - S{pessoa_num:03d}')
+            plt.xlabel('Época')
+            plt.legend()
+
+            plt.subplot(1, 2, 2)
+            plt.plot(history.history['loss'], label='Treino')
+            plt.plot(history.history['val_loss'], label='Validação')
+            plt.title(f'Loss - S{pessoa_num:03d}')
+            plt.xlabel('Época')
+            plt.legend()
+
+            plt.savefig(os.path.join(pasta_graficos, f"S{pessoa_num:03d}_treinamento.png"))
+            plt.close()
+
+            # Salvar melhor acurácia
+            melhor_acc = max(history.history['val_accuracy'])
+            resultados[pessoa_num] = melhor_acc
+            print(f"Melhor val_accuracy: {melhor_acc*100:.2f}%")
+
+            # Limpeza
+            del epocas, x, y, X_train, X_test, Y_train, Y_test, model, history
+            gc.collect()
+
+        except Exception as e:
+            print(f"Erro em S{pessoa_num:03d}: {str(e)}")
+            resultados[pessoa_num] = None
+            continue
+
+    # Salvar resultados
+    with open("resultados_dnn.csv", "w") as f:
+        f.write("Pessoa,Melhor_Val_Accuracy\n")
+        for pessoa, acc in resultados.items():
+            if acc is not None:
+                f.write(f"S{pessoa:03d},{acc:.4f}\n")
+            else:
+                f.write(f"S{pessoa:03d},N/A\n")
+
+    print("\nProcessamento concluído! Resultados salvos em resultados_dnn.csv")
+
+if __name__ == "__main__":
+    main()
