@@ -26,12 +26,12 @@ tempo_fase3 = 124.99
 # Limiar para decisão T1 / T2
 limiar = 0.4
 
-def normalize_sample(input_sample):
+def normalize_sample(input_sample): #Normaliza cada sample com o input_shape esperado de forma unica, ou seja cada sample vai ter sua normalização com base no seu val max e min 
     inp = np.array(input_sample)
     local_max, local_min = inp.max(), inp.min()
     return (inp - local_min) / (local_max - local_min + 1e-8)
 
-def predict(model, input_sample):
+def predict(model, input_sample): # np.expand faz o tensor sair de (721,16) para (1,721,16)m training é false para que n mude a plasticidade do modelo
     arr = normalize_sample(input_sample)
     arr = np.expand_dims(arr, axis=0)
     return model(arr, training=False)
@@ -46,24 +46,24 @@ print("Stream EEG encontrada!")
 
 class Sistema:
     def __init__(self):
-        self.dt = 4.506
+        self.dt = 4.506 #Apenas tempo de atualização dos gráficos (n interfere em nada o tamanho das épocas)
 sistema = Sistema()
 
 tgraf = []
-buffer_x, buffer_y = [], []
-batch_size = 1
+buffer_x, buffer_y = [], []  # Épocas completas com o shape esperado e sua classe 
+batch_size = 1 #é o q faz ser época unica ed (721,16) se batch size for diferente o código ia pegar 'n' epochs de uma vez 
 task2label = {'T1': 0, 'T2': 1}
 
 # Controle de fases
 tempo_inicio = None
 fase_atual = 1
-label_fase1 = fase1_forced_label
+label_fase1 = fase1_forced_label # definido se começa com t1 ou t2 devido ao dado combinado (inicialmente testado com t1 começando na fase 1 )
 if label_fase1 not in ['T1','T2']:
     raise ValueError("fase1_forced_label deve ser 'T1' ou 'T2'.")
 print(f"Fase 1 configurada para aceitar sempre: {label_fase1}")
 
 # Aquisição de dados
-current_data = []
+current_data = [] 
 started = False
 
 plt.ion()
@@ -107,7 +107,7 @@ while not keyboard.is_pressed('Esc'):
             print("-> Todas as fases concluídas. Encerrando loop.")
             break
 
-        # Sliding window
+        # Sliding window aq 
         current_data.append(sample)
         if len(current_data) > epochsize:
             current_data.pop(0)

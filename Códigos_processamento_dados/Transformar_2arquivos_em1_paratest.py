@@ -4,7 +4,7 @@ import pandas as pd
 import os
 
 # ==============================================================================
-# FUNÇÕES DE PROCESSAMENTO (NÃO EDITAR)
+# FUNÇÕES DE PROCESSAMENTO (NÃO EDITAR) E ADICIONAR 0s no inicio do arquivo
 # ==============================================================================
 
 def processar_edf(edf_path, tarefas, decimal):
