@@ -8,14 +8,14 @@ from sys import exit
 import gc
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-
+# PARA O ARQUIVO DE FASES A FASE 1 É T1 28 SEGUNDOS, T2 24,5 SEGUNDOS E OS DADOS COMPLETOS 124,99 S 
 # Importa o modelo e as funções do Keras
 from keras.models import load_model
 from tensorflow.keras.optimizers import Adam
 import tensorflow.keras.utils as kutils
 
 # Carrega o modelo (com saída Dense(1, activation='sigmoid'))
-model = load_model(r"C:\Users\LaBios - BCI\Downloads\melhor_modelo_0.8871 (1).h5")
+model = load_model(r"C:\Users\batis\Downloads\melhor_modelo_0.8871.h5")
 model.compile(optimizer=Adam(1e-4), loss='binary_crossentropy', metrics=['accuracy'])
 model.summary()
 contador=0
