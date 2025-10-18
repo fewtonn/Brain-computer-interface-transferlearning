@@ -9,8 +9,8 @@ from io import StringIO
 # ============================================================================== #
 # CONFIGURAÇÃO
 # ============================================================================== #
-DIRETORIO_ARQUIVOS = r"C:\Users\batis\OneDrive\Área de Trabalho\Códigos diversos\Faculdade\BCI\Dados BRUTOS\files\S086"
-ARQUIVO_SAIDA = r"C:\Users\batis\OneDrive\Área de Trabalho\Brain Computer Interface\TESTE_tUDO_JUNTO_COMT0_NOVAMENTEE.csv"
+DIRETORIO_ARQUIVOS = r"Coloque o caminho da pasta com os arquivos das pessoas aqui "
+ARQUIVO_SAIDA = r"coloque um arquvio de saida CSV aqui "
 PADROES_ARQUIVOS = ["*R04.edf", "*R08.edf", "*R12.edf"]
 LISTA_EPOCAS = ['T1', 'T2', 'T0']
 

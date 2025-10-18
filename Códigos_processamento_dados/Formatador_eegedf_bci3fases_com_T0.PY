@@ -10,8 +10,8 @@ from io import StringIO
 # ============================================================================== #
 # CONFIGURAÇÃO
 # ============================================================================== #
-DIRETORIO_ARQUIVOS = r"C:\Users\batis\OneDrive\Área de Trabalho\Códigos diversos\Faculdade\BCI\Dados BRUTOS\files\S086"
-ARQUIVO_SAIDA = r"C:\Users\batis\OneDrive\Área de Trabalho\Brain Computer Interface\teste.csv"
+DIRETORIO_ARQUIVOS = r"Coloque a pasta de arquivos de uma pessoa com os edf aqui"
+ARQUIVO_SAIDA = r"Coloque o caminho de saida em csv aqui"
 PADROES_ARQUIVOS = ["*R04.edf", "*R08.edf", "*R12.edf"]
 LISTA_EPOCAS = ['T1', 'T2', 'T0']
 CANAIS_DESEJADOS = ['Fp1.', 'F7..', 'F3..', 'T7..', 'C3..', 'P7..', 'P3..', 'O1..',
